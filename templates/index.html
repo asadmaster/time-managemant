@@ -1,0 +1,793 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Sempla — Time Management</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <style>
+    /* ── RESET & TOKENS ──────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:      #ffffff;
+      --surface: #f7f7f7;
+      --border:  #e0e0e0;
+      --ink:     #0a0a0a;
+      --ink2:    #444444;
+      --muted:   #999999;
+      --accent:  #0a0a0a;
+      --danger:  #0a0a0a;
+      --radius:  4px;
+      --mono:    'Courier New', Courier, monospace;
+    }
+
+    html { font-size: 15px; }
+
+    body {
+      background: var(--bg);
+      color: var(--ink);
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      min-height: 100vh;
+    }
+
+    /* ── TOPBAR ──────────────────────────────────── */
+    header {
+      background: var(--ink);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 2rem;
+      height: 56px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .logo {
+      font-family: var(--mono);
+      font-size: 1.15rem;
+      letter-spacing: 0.15em;
+      font-weight: 700;
+    }
+
+    .logo span { color: #aaa; font-weight: 400; }
+
+    .header-right {
+      font-family: var(--mono);
+      font-size: 0.75rem;
+      color: #888;
+      letter-spacing: 0.1em;
+    }
+
+    /* ── LAYOUT ──────────────────────────────────── */
+    .container {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 2rem;
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 380px 1fr;
+      gap: 1.5rem;
+      align-items: start;
+    }
+
+    /* ── PANEL ───────────────────────────────────── */
+    .panel {
+      background: var(--bg);
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+
+    .panel-header {
+      background: var(--ink);
+      color: #fff;
+      padding: 0.75rem 1.2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-family: var(--mono);
+      font-size: 0.78rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .panel-body { padding: 1.5rem; }
+
+    /* ── FORM ────────────────────────────────────── */
+    .form-group { margin-bottom: 1.1rem; }
+
+    label {
+      display: block;
+      font-family: var(--mono);
+      font-size: 0.72rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 0.4rem;
+    }
+
+    input[type="text"],
+    input[type="date"],
+    input[type="time"] {
+      width: 100%;
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius);
+      padding: 0.6rem 0.8rem;
+      font-size: 0.95rem;
+      font-family: inherit;
+      color: var(--ink);
+      background: var(--bg);
+      transition: border-color 0.15s;
+      outline: none;
+    }
+
+    input:focus { border-color: var(--ink); }
+
+    .time-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.8rem;
+    }
+
+    /* ── BUTTONS ─────────────────────────────────── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.4rem;
+      border: 1.5px solid var(--ink);
+      border-radius: var(--radius);
+      padding: 0.6rem 1.2rem;
+      font-family: var(--mono);
+      font-size: 0.78rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+      background: transparent;
+      color: var(--ink);
+      white-space: nowrap;
+    }
+
+    .btn-filled {
+      background: var(--ink);
+      color: #fff;
+    }
+
+    .btn-filled:hover { background: #333; }
+    .btn:hover:not(.btn-filled) { background: var(--ink); color: #fff; }
+
+    .btn-sm {
+      padding: 0.35rem 0.7rem;
+      font-size: 0.7rem;
+    }
+
+    .btn-danger:hover { background: #111; border-color: #111; color: #fff; }
+
+    #submitBtn { width: 100%; margin-top: 0.5rem; }
+
+    /* ── TOAST ───────────────────────────────────── */
+    #toast {
+      position: fixed;
+      bottom: 2rem;
+      right: 2rem;
+      background: var(--ink);
+      color: #fff;
+      padding: 0.75rem 1.5rem;
+      border-radius: var(--radius);
+      font-family: var(--mono);
+      font-size: 0.8rem;
+      letter-spacing: 0.05em;
+      opacity: 0;
+      transform: translateY(10px);
+      transition: opacity 0.25s, transform 0.25s;
+      z-index: 999;
+      pointer-events: none;
+      max-width: 320px;
+    }
+
+    #toast.show { opacity: 1; transform: none; }
+    #toast.error { background: #c00; }
+
+    /* ── DATE FILTER ─────────────────────────────── */
+    .filter-bar {
+      display: flex;
+      align-items: center;
+      gap: 0.8rem;
+      margin-bottom: 1.5rem;
+      flex-wrap: wrap;
+    }
+
+    .filter-bar label { margin: 0; }
+
+    .filter-bar input[type="date"] { width: auto; min-width: 150px; }
+
+    .filter-bar .entry-count {
+      margin-left: auto;
+      font-family: var(--mono);
+      font-size: 0.72rem;
+      color: var(--muted);
+      letter-spacing: 0.08em;
+    }
+
+    /* ── TABLE ───────────────────────────────────── */
+    .table-wrap {
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9rem;
+    }
+
+    thead tr {
+      background: var(--surface);
+    }
+
+    th {
+      font-family: var(--mono);
+      font-size: 0.7rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--muted);
+      padding: 0.6rem 0.8rem;
+      text-align: left;
+      border-bottom: 1.5px solid var(--border);
+    }
+
+    td {
+      padding: 0.65rem 0.8rem;
+      border-bottom: 1px solid var(--border);
+      vertical-align: middle;
+    }
+
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: var(--surface); }
+
+    .work-name-cell {
+      font-weight: 600;
+      max-width: 180px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .time-cell {
+      font-family: var(--mono);
+      font-size: 0.83rem;
+      color: var(--ink2);
+    }
+
+    .dur-cell {
+      font-family: var(--mono);
+      font-size: 0.8rem;
+      color: var(--muted);
+    }
+
+    .actions-cell {
+      display: flex;
+      gap: 0.4rem;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 3rem 1rem;
+      font-family: var(--mono);
+      font-size: 0.8rem;
+      color: var(--muted);
+      letter-spacing: 0.1em;
+    }
+
+    /* ── CHART SECTION ───────────────────────────── */
+    .chart-wrap {
+      position: relative;
+      height: 280px;
+    }
+
+    .chart-tabs {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+    }
+
+    .chart-tab {
+      font-family: var(--mono);
+      font-size: 0.72rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      padding: 0.35rem 0.9rem;
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius);
+      cursor: pointer;
+      background: transparent;
+      color: var(--muted);
+      transition: all 0.15s;
+    }
+
+    .chart-tab.active {
+      background: var(--ink);
+      color: #fff;
+      border-color: var(--ink);
+    }
+
+    /* ── MODAL (inline edit) ─────────────────────── */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.55);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 200;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s;
+    }
+
+    .modal-overlay.open { opacity: 1; pointer-events: all; }
+
+    .modal {
+      background: var(--bg);
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius);
+      width: 420px;
+      max-width: 95vw;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+      transform: translateY(20px);
+      transition: transform 0.2s;
+    }
+
+    .modal-overlay.open .modal { transform: none; }
+
+    .modal-header {
+      background: var(--ink);
+      color: #fff;
+      padding: 0.75rem 1.2rem;
+      font-family: var(--mono);
+      font-size: 0.78rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .modal-close {
+      background: none;
+      border: none;
+      color: #fff;
+      font-size: 1.1rem;
+      cursor: pointer;
+      line-height: 1;
+      opacity: 0.6;
+    }
+
+    .modal-close:hover { opacity: 1; }
+
+    .modal-body { padding: 1.5rem; }
+
+    .modal-footer {
+      padding: 0 1.5rem 1.5rem;
+      display: flex;
+      gap: 0.7rem;
+      justify-content: flex-end;
+    }
+
+    /* ── RESPONSIVE ──────────────────────────────── */
+    @media (max-width: 820px) {
+      .grid-2 { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 520px) {
+      .container { padding: 1rem; }
+      .panel-body { padding: 1rem; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">SEMPLA<span> / time management</span></div>
+  <div class="header-right" id="liveClock">--:--:--</div>
+</header>
+
+<div class="container">
+  <div class="grid-2">
+
+    <!-- ── LEFT: FORM ── -->
+    <div>
+      <div class="panel" style="margin-bottom:1.5rem;">
+        <div class="panel-header">
+          <span id="formModeLabel">＋ New Work Entry</span>
+        </div>
+        <div class="panel-body">
+          <div class="form-group">
+            <label>Work / Task Name</label>
+            <input type="text" id="workName" placeholder="e.g. Design wireframes"/>
+          </div>
+          <div class="form-group">
+            <label>Date</label>
+            <input type="date" id="workDate"/>
+          </div>
+          <div class="form-group">
+            <label>Time Range</label>
+            <div class="time-row">
+              <div>
+                <label>Start</label>
+                <input type="time" id="startTime"/>
+              </div>
+              <div>
+                <label>End</label>
+                <input type="time" id="endTime"/>
+              </div>
+            </div>
+          </div>
+          <button class="btn btn-filled" id="submitBtn" onclick="submitForm()">
+            ＋ ADD ENTRY
+          </button>
+          <button class="btn" id="cancelEditBtn" style="width:100%;margin-top:0.5rem;display:none" onclick="cancelEdit()">
+            ✕ CANCEL EDIT
+          </button>
+        </div>
+      </div>
+
+      <!-- MINI STATS -->
+      <div class="panel">
+        <div class="panel-header"><span>STATS</span></div>
+        <div class="panel-body" style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+          <div style="text-align:center;">
+            <div style="font-family:var(--mono);font-size:2rem;font-weight:700;" id="statTotal">0</div>
+            <div style="font-family:var(--mono);font-size:0.68rem;letter-spacing:0.1em;color:var(--muted);text-transform:uppercase;">Total Entries</div>
+          </div>
+          <div style="text-align:center;">
+            <div style="font-family:var(--mono);font-size:2rem;font-weight:700;" id="statHours">0h</div>
+            <div style="font-family:var(--mono);font-size:0.68rem;letter-spacing:0.1em;color:var(--muted);text-transform:uppercase;">Total Hours</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── RIGHT: TABLE + CHART ── -->
+    <div>
+      <!-- TABLE -->
+      <div class="panel" style="margin-bottom:1.5rem;">
+        <div class="panel-header">
+          <span>WORK LOG</span>
+        </div>
+        <div class="panel-body">
+          <div class="filter-bar">
+            <label>Filter by date:</label>
+            <input type="date" id="filterDate" onchange="loadEntries()"/>
+            <button class="btn btn-sm" onclick="clearFilter()">CLEAR</button>
+            <span class="entry-count" id="entryCount">— entries</span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Work</th>
+                  <th>Date</th>
+                  <th>Start</th>
+                  <th>End</th>
+                  <th>Duration</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="tableBody">
+                <tr><td colspan="6" class="empty-state">NO ENTRIES YET</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- CHART -->
+      <div class="panel">
+        <div class="panel-header"><span>CHART — TIME PER DAY</span></div>
+        <div class="panel-body">
+          <div class="chart-tabs">
+            <button class="chart-tab active" onclick="switchChart('bar',this)">Bar</button>
+            <button class="chart-tab" onclick="switchChart('line',this)">Line</button>
+            <button class="chart-tab" onclick="switchChart('doughnut',this)">Doughnut</button>
+          </div>
+          <div class="chart-wrap">
+            <canvas id="myChart"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ── EDIT MODAL ── -->
+<div class="modal-overlay" id="editModal">
+  <div class="modal">
+    <div class="modal-header">
+      <span>EDIT ENTRY</span>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="editId"/>
+      <div class="form-group">
+        <label>Work / Task Name</label>
+        <input type="text" id="editWorkName"/>
+      </div>
+      <div class="form-group">
+        <label>Date</label>
+        <input type="date" id="editDate"/>
+      </div>
+      <div class="form-group">
+        <label>Time Range</label>
+        <div class="time-row">
+          <div>
+            <label>Start</label>
+            <input type="time" id="editStart"/>
+          </div>
+          <div>
+            <label>End</label>
+            <input type="time" id="editEnd"/>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-sm" onclick="closeModal()">CANCEL</button>
+      <button class="btn btn-sm btn-filled" onclick="saveEdit()">SAVE CHANGES</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ── CLOCK ──────────────────────────────────────
+function tickClock(){
+  const now = new Date();
+  document.getElementById('liveClock').textContent =
+    now.toLocaleTimeString('en-GB');
+}
+tickClock(); setInterval(tickClock, 1000);
+
+// ── DEFAULT DATE ───────────────────────────────
+document.getElementById('workDate').value = new Date().toISOString().split('T')[0];
+
+// ── TOAST ──────────────────────────────────────
+function toast(msg, isErr=false){
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'show' + (isErr ? ' error' : '');
+  clearTimeout(el._t);
+  el._t = setTimeout(()=>el.className='', 2800);
+}
+
+// ── CHART ──────────────────────────────────────
+let chart = null;
+let currentChartType = 'bar';
+
+function fmtMin(m){ return Math.round(m/60*10)/10 + 'h'; }
+
+async function loadChart(){
+  const res = await fetch('/api/chart');
+  const d = await res.json();
+  const labels = d.dates;
+  const works = d.works;
+
+  let datasets;
+  if(currentChartType === 'doughnut'){
+    // sum hours per work across all dates
+    const totals = {};
+    works.forEach(w => totals[w] = 0);
+    labels.forEach(date=>{
+      (d.data[date]||[]).forEach(e=>{
+        totals[e.work_name] = (totals[e.work_name]||0) + e.total_min;
+      });
+    });
+    const shades = works.map((_,i)=>{
+      const v = Math.round(20 + (i/(works.length||1))*200);
+      return `rgb(${v},${v},${v})`;
+    });
+    datasets = [{
+      data: works.map(w=>Math.round(totals[w]/60*10)/10),
+      backgroundColor: shades,
+      borderColor: '#fff',
+      borderWidth: 2
+    }];
+    renderChart(works, datasets);
+    return;
+  }
+
+  const shades = works.map((_,i)=>{
+    const v = Math.round(20 + (i/(works.length||1))*200);
+    return `rgb(${v},${v},${v})`;
+  });
+
+  datasets = works.map((w,i)=>({
+    label: w,
+    data: labels.map(date=>{
+      const entry = (d.data[date]||[]).find(e=>e.work_name===w);
+      return entry ? Math.round(entry.total_min/60*10)/10 : 0;
+    }),
+    backgroundColor: shades[i] + (currentChartType==='bar'?'dd':'33'),
+    borderColor: shades[i],
+    borderWidth: 2,
+    tension: 0.3,
+    fill: false,
+    pointRadius: 4
+  }));
+
+  renderChart(labels, datasets);
+}
+
+function renderChart(labels, datasets){
+  if(chart) chart.destroy();
+  const ctx = document.getElementById('myChart').getContext('2d');
+  chart = new Chart(ctx, {
+    type: currentChartType,
+    data: { labels, datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          labels: {
+            font:{ family:"'Courier New',monospace", size:11 },
+            color:'#444'
+          }
+        },
+        tooltip:{
+          callbacks:{
+            label: ctx => ` ${ctx.dataset.label || ctx.label}: ${ctx.parsed.y ?? ctx.parsed}h`
+          }
+        }
+      },
+      scales: currentChartType === 'doughnut' ? {} : {
+        x:{
+          ticks:{ font:{family:"'Courier New',monospace",size:10}, color:'#999' },
+          grid:{ color:'rgba(0,0,0,0.05)' }
+        },
+        y:{
+          ticks:{ font:{family:"'Courier New',monospace",size:10}, color:'#999',
+            callback: v => v + 'h' },
+          grid:{ color:'rgba(0,0,0,0.07)' },
+          beginAtZero: true
+        }
+      }
+    }
+  });
+}
+
+function switchChart(type, btn){
+  currentChartType = type;
+  document.querySelectorAll('.chart-tab').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  loadChart();
+}
+
+// ── TABLE ──────────────────────────────────────
+function fmtDur(min){
+  const h = Math.floor(min/60);
+  const m = min%60;
+  return h ? `${h}h ${m}m` : `${m}m`;
+}
+
+async function loadEntries(){
+  const date = document.getElementById('filterDate').value;
+  const url = date ? `/api/entries?date=${date}` : '/api/entries';
+  const res = await fetch(url);
+  const entries = await res.json();
+
+  const tbody = document.getElementById('tableBody');
+  if(!entries.length){
+    tbody.innerHTML = '<tr><td colspan="6" class="empty-state">NO ENTRIES FOUND</td></tr>';
+    document.getElementById('entryCount').textContent = '0 entries';
+    document.getElementById('statTotal').textContent = 0;
+    document.getElementById('statHours').textContent = '0h';
+    return;
+  }
+
+  document.getElementById('entryCount').textContent = entries.length + ' entries';
+  document.getElementById('statTotal').textContent = entries.length;
+  const totalMin = entries.reduce((s,e)=>s+e.duration,0);
+  document.getElementById('statHours').textContent = Math.round(totalMin/60*10)/10 + 'h';
+
+  tbody.innerHTML = entries.map(e=>`
+    <tr>
+      <td class="work-name-cell" title="${e.work_name}">${e.work_name}</td>
+      <td class="time-cell">${e.date}</td>
+      <td class="time-cell">${e.start_time}</td>
+      <td class="time-cell">${e.end_time}</td>
+      <td class="dur-cell">${fmtDur(e.duration)}</td>
+      <td class="actions-cell">
+        <button class="btn btn-sm" onclick="openEdit(${e.id},'${e.work_name}','${e.date}','${e.start_time}','${e.end_time}')">EDIT</button>
+        <button class="btn btn-sm btn-danger" onclick="deleteEntry(${e.id})">DEL</button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+// ── CREATE ─────────────────────────────────────
+async function submitForm(){
+  const body = {
+    work_name:  document.getElementById('workName').value,
+    date:       document.getElementById('workDate').value,
+    start_time: document.getElementById('startTime').value,
+    end_time:   document.getElementById('endTime').value,
+  };
+  const res = await fetch('/api/entries', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify(body)
+  });
+  const d = await res.json();
+  if(!res.ok){ toast(d.error, true); return; }
+  toast('Entry added (' + fmtDur(d.duration) + ')');
+  document.getElementById('workName').value = '';
+  document.getElementById('startTime').value = '';
+  document.getElementById('endTime').value = '';
+  loadEntries(); loadChart();
+}
+
+// ── DELETE ─────────────────────────────────────
+async function deleteEntry(id){
+  if(!confirm('Delete this entry?')) return;
+  await fetch('/api/entries/'+id, {method:'DELETE'});
+  toast('Entry deleted');
+  loadEntries(); loadChart();
+}
+
+// ── EDIT MODAL ─────────────────────────────────
+function openEdit(id, name, date, start, end){
+  document.getElementById('editId').value = id;
+  document.getElementById('editWorkName').value = name;
+  document.getElementById('editDate').value = date;
+  document.getElementById('editStart').value = start;
+  document.getElementById('editEnd').value = end;
+  document.getElementById('editModal').classList.add('open');
+}
+
+function closeModal(){
+  document.getElementById('editModal').classList.remove('open');
+}
+
+async function saveEdit(){
+  const id = document.getElementById('editId').value;
+  const body = {
+    work_name:  document.getElementById('editWorkName').value,
+    date:       document.getElementById('editDate').value,
+    start_time: document.getElementById('editStart').value,
+    end_time:   document.getElementById('editEnd').value,
+  };
+  const res = await fetch('/api/entries/'+id, {
+    method:'PUT', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify(body)
+  });
+  const d = await res.json();
+  if(!res.ok){ toast(d.error, true); return; }
+  toast('Entry updated');
+  closeModal(); loadEntries(); loadChart();
+}
+
+function clearFilter(){
+  document.getElementById('filterDate').value = '';
+  loadEntries();
+}
+
+function cancelEdit(){} // placeholder
+
+// ── CLOSE MODAL ON OVERLAY CLICK ───────────────
+document.getElementById('editModal').addEventListener('click', e=>{
+  if(e.target === e.currentTarget) closeModal();
+});
+
+// ── INIT ───────────────────────────────────────
+loadEntries();
+loadChart();
+</script>
+</body>
+</html>
